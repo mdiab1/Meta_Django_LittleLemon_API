@@ -15,11 +15,18 @@ class MenuItemSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'price', 'featured', 'category', 'category_id']
 
 class CartSerializer(serializers.ModelSerializer):
-    cart_id = serializers.IntegerField(write_only=True)
     menuitem = MenuItemSerializer()
     class Meta:
         model = Cart
-        fields = ['user', 'menuitem', 'quantity', 'unit_price', 'price', 'cart_id']
+        fields = ['menuitem', 'quantity', 'price']
+
+class CartPostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Cart
+        fields = ['menuitem', 'quantity']
+        extra_kwargs = {
+            'quantity': {'min_value': 1},
+        }
 
 
 

@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework import generics
 from .models import Category, MenuItem, Cart
-from .serializers import MenuItemSerializer, CategorySerializer, CartSerializer, UserSerializer
+from .serializers import MenuItemSerializer, CategorySerializer, CartSerializer, UserSerializer, CartPostSerializer
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -50,12 +50,33 @@ class MenuItemSingleView(generics.RetrieveUpdateDestroyAPIView):
             permission_classes = [IsAuthenticated, IsManager]
         return [permission() for permission in permission_classes]
     
+class CartItemsView(generics.ListCreateAPIView):
+    #queryset = Cart.objects.all()
+    serializer_class = CartSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Cart.objects.all().filter(user=self.request.user)
+    
+    def post(self, request):
+        cart_item = CartPostSerializer(data=request.data)
+        cart_item.is_valid(raise_exception=True)
+        menuItemID = request.data['menuitem']
+        quantity = request.data['quantity']
+        menuItem = get_object_or_404(MenuItem, id=menuItemID)
+        price = int(quantity) * menuItem.price
+        try:
+            Cart.objects.create(user=request.user, menuitem=menuItem, quantity=quantity, unit_price=menuItem.price, price=price)
+            return Response("Added to cart")
+        except:
+            return Response("Already in cart")
+        
+    def delete(self, request):
+        Cart.objects.filter(user=request.user).delete()
+        return Response("Deleted", 200)
+
 
     
-    
-
-
-
 @api_view(['GET', 'POST', 'DELETE'])
 @permission_classes([IsAuthenticated])
 @authentication_classes([TokenAuthentication])
