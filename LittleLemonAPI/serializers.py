@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, MenuItem, Cart
+from .models import Category, MenuItem, Cart, Order
 from django.contrib.auth.models import User
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -28,11 +28,16 @@ class CartPostSerializer(serializers.ModelSerializer):
             'quantity': {'min_value': 1},
         }
 
-
-
-
-
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email']
+
+class OrderSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+    class Meta:
+        model = Order
+        fields = ['user', 'id', 'delivery_crew', 'status', 'total', 'date']
+
+
+

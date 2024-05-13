@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework import generics
-from .models import Category, MenuItem, Cart
-from .serializers import MenuItemSerializer, CategorySerializer, CartSerializer, UserSerializer, CartPostSerializer
+from .models import Category, MenuItem, Cart, Order, OrderItem
+from .serializers import MenuItemSerializer, CategorySerializer, CartSerializer, UserSerializer, CartPostSerializer, OrderSerializer
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -12,6 +12,8 @@ from django.contrib.auth.models import User, Group
 from django.shortcuts import get_object_or_404
 
 from .permissions import IsDelCrew, IsManager
+
+from datetime import date
 # Create your views here.
 
 class CategoryView(generics.ListCreateAPIView):
@@ -75,8 +77,96 @@ class CartItemsView(generics.ListCreateAPIView):
         Cart.objects.filter(user=request.user).delete()
         return Response("Deleted", 200)
 
+class OrderView(generics.ListCreateAPIView):
+    #queryset = Order.objects.all()
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        if IsManager().has_permission(self.request, self):
+            query = Order.objects.all()
+        elif IsDelCrew().has_permission(self.request, self):
+            query = Order.objects.filter(delivery_crew=self.request.user)
+        else:
+            query = Order.objects.filter(user=self.request.user)
+        return query
+    """
+    def get_permissions(self):
+        permission_classes = [AllowAny]
+        if self.request.method == 'POST':
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+    """
+    def post(self, request):
+        user = request.user
+        cart = Cart.objects.filter(user=user)
+        if len(cart.values()) == 0:
+            return Response("No items in cart")
+        total = 0
+        for item in cart.values():
+            total += item['price']
+        order = Order.objects.create(user=user, total=total, date=date.today())
+        for item in cart.values():
+            menuItem = get_object_or_404(MenuItem, id=item['menuitem_id'])
+            orderitem = OrderItem.objects.create(
+                order=order,
+                menuitem=menuItem,
+                quantity=item['quantity'],
+                unit_price=item['unit_price'],
+                price=total
+                )
+            orderitem.save()
+        cart.delete()
+        return Response("Order Placed!", 201)
+
+class SingleOrderView(generics.RetrieveUpdateDestroyAPIView):
+    #queryset = Order.objects.all()
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if IsManager().has_permission(self.request, self):
+            query = Order.objects.all()
+        elif IsDelCrew().has_permission(self.request, self):
+            query = Order.objects.filter(delivery_crew=self.request.user)
+        else:
+            query = Order.objects.filter(user=self.request.user)
+        return query
     
+    def get_permissions(self):
+        permission_classes = []
+        if self.request.method == 'GET':
+            permission_classes = [IsAuthenticated]
+        elif self.request.method == 'PATCH':
+            permission_classes = [IsAuthenticated, IsManager | IsDelCrew]
+        elif self.request.method == "DELETE" or self.request.method == 'PUT':
+            permission_classes = [IsManager]
+        return [permission() for permission in permission_classes]
+    
+    def patch(self, request, *args, **kwargs):
+        order = Order.objects.get(pk=self.kwargs['pk'])
+        print(order.delivery_crew)
+        if order.delivery_crew != self.request.user:
+            return Response("Not Assigned to this order")
+        order.status = not order.status
+        order.save()
+        return Response("Status for order #: " + str(order.id) + " changed to: " + str(order.status), 201)
+
+    def delete(self, request, *args, **kwargs):
+        order = Order.objects.get(pk=self.kwargs['pk'])
+        order.delete()
+        return Response("Deleted Order", 200)
+
+    def put(self, request, *args, **kwargs):
+        order_pk = self.kwargs['pk']
+        crew_pk = request.data['delivery_crew'] 
+        order = get_object_or_404(Order, pk=order_pk)
+        crew = get_object_or_404(User, pk=crew_pk)
+        order.delivery_crew = crew
+        order.save()
+        return Response("Updated Delivery Crew to: " + crew.username, 201)
+
+
 @api_view(['GET', 'POST', 'DELETE'])
 @permission_classes([IsAuthenticated])
 @authentication_classes([TokenAuthentication])
