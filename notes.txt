@@ -1,0 +1,27 @@
+Username and passwords:
+
+Superuser
+Username: admin
+Password: admin1
+
+Managers
+Username: manager1
+Password: john1111
+Username: manager2
+Password: sam11111
+
+Customer
+Username: customer1
+Password: hi123456
+Username: customer2
+Password: hi123456
+
+Delivery Crew
+Username: driver1
+Password: hi123456
+
+Note: Getting a token
+To get a token, send a post request to this endpoint http://127.0.0.1:8000/auth/token/login with username and password form fields 
+
+Note: Adding a menu item
+To add a menu items, send a post request to this endpoint http://127.0.0.1:8000/api/menu-items with manager or admin token. You need to provide: title, price, featured, category_id

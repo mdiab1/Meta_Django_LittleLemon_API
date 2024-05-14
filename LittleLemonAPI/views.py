@@ -12,7 +12,7 @@ from django.contrib.auth.models import User, Group
 from django.shortcuts import get_object_or_404
 
 from .permissions import IsDelCrew, IsManager
-
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 from datetime import date
 # Create your views here.
 
@@ -21,6 +21,7 @@ class CategoryView(generics.ListCreateAPIView):
     serializer_class = CategorySerializer
 
 class MenuItemsView(generics.ListCreateAPIView):
+    throttle_classes = [AnonRateThrottle, UserRateThrottle]
     queryset = MenuItem.objects.all()
     serializer_class = MenuItemSerializer
     ordering_fields = ['price']
@@ -30,7 +31,7 @@ class MenuItemsView(generics.ListCreateAPIView):
     def get_permissions(self):
         permission_classes = [AllowAny]
         if self.request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-            permission_classes = [IsAuthenticated, IsManager]
+            permission_classes = [IsAuthenticated, IsManager | IsAdminUser]
         return [permission() for permission in permission_classes]
 
     def put(self, request):
@@ -43,17 +44,18 @@ class MenuItemsView(generics.ListCreateAPIView):
         return Response("Not Supported")
     
 class MenuItemSingleView(generics.RetrieveUpdateDestroyAPIView):
+    throttle_classes = [AnonRateThrottle, UserRateThrottle]
     queryset = MenuItem.objects.all()
     serializer_class = MenuItemSerializer
     
     def get_permissions(self):
         permission_classes = [AllowAny]
         if self.request.method in ['PUT', 'PATCH', 'DELETE']:
-            permission_classes = [IsAuthenticated, IsManager]
+            permission_classes = [IsAuthenticated, IsManager | IsAdminUser]
         return [permission() for permission in permission_classes]
     
 class CartItemsView(generics.ListCreateAPIView):
-    #queryset = Cart.objects.all()
+    throttle_classes = [AnonRateThrottle, UserRateThrottle]
     serializer_class = CartSerializer
     permission_classes = [IsAuthenticated]
 
@@ -78,7 +80,7 @@ class CartItemsView(generics.ListCreateAPIView):
         return Response("Deleted", 200)
 
 class OrderView(generics.ListCreateAPIView):
-    #queryset = Order.objects.all()
+    throttle_classes = [AnonRateThrottle, UserRateThrottle]
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
 
@@ -90,13 +92,7 @@ class OrderView(generics.ListCreateAPIView):
         else:
             query = Order.objects.filter(user=self.request.user)
         return query
-    """
-    def get_permissions(self):
-        permission_classes = [AllowAny]
-        if self.request.method == 'POST':
-            permission_classes = [IsAuthenticated]
-        return [permission() for permission in permission_classes]
-    """
+
     def post(self, request):
         user = request.user
         cart = Cart.objects.filter(user=user)
@@ -120,7 +116,7 @@ class OrderView(generics.ListCreateAPIView):
         return Response("Order Placed!", 201)
 
 class SingleOrderView(generics.RetrieveUpdateDestroyAPIView):
-    #queryset = Order.objects.all()
+    throttle_classes = [AnonRateThrottle, UserRateThrottle]
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
 
@@ -172,7 +168,7 @@ class SingleOrderView(generics.RetrieveUpdateDestroyAPIView):
 @authentication_classes([TokenAuthentication])
 def managers(request):
     username = request.user
-    user_in_group = username.groups.filter(name="Managers").exists()
+    user_in_group = username.groups.filter(name="Managers").exists() or request.user.is_staff
     if username and user_in_group:
         managers = Group.objects.get(name="Managers")
         if request.method == 'GET':
@@ -199,7 +195,7 @@ def managers(request):
 @authentication_classes([TokenAuthentication])
 def delivery_crew(request):
     username = request.user
-    is_user_in_managers_group = username.groups.filter(name="Managers").exists()
+    is_user_in_managers_group = username.groups.filter(name="Managers").exists() or request.user.is_staff
     if username and is_user_in_managers_group:
         delivery_crew_users = Group.objects.get(name="Delivery_Crew")
         if request.method == 'GET':
