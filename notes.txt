@@ -15,6 +15,8 @@ Username: customer1
 Password: hi123456
 Username: customer2
 Password: hi123456
+Username: customer3
+Password: hi123456
 
 Delivery Crew
 Username: driver1
@@ -25,3 +27,7 @@ To get a token, send a post request to this endpoint http://127.0.0.1:8000/auth/
 
 Note: Adding a menu item
 To add a menu items, send a post request to this endpoint http://127.0.0.1:8000/api/menu-items with manager or admin token. You need to provide: title, price, featured, category_id
+
+Note: Manager assign order to delivery crew
+Make PATCH request to http://127.0.0.1:8000/api/orders/6 with field delivery_crew = 6
+

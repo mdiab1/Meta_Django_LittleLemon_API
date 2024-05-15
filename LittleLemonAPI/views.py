@@ -19,14 +19,19 @@ from datetime import date
 class CategoryView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    def get_permissions(self):
+        permission_classes = [AllowAny]
+        if self.request.method == 'POST':
+            permission_classes = [IsAuthenticated, IsManager | IsAdminUser]
+        return [permission() for permission in permission_classes]
 
 class MenuItemsView(generics.ListCreateAPIView):
     throttle_classes = [AnonRateThrottle, UserRateThrottle]
     queryset = MenuItem.objects.all()
     serializer_class = MenuItemSerializer
-    ordering_fields = ['price']
-    filterset_fields = ['price', 'category']
-    search_fields = ['title']
+    search_fields = ['title', 'category__title']
+    ordering_fields = ['price', 'category']
+    
     
     def get_permissions(self):
         permission_classes = [AllowAny]
@@ -142,11 +147,19 @@ class SingleOrderView(generics.RetrieveUpdateDestroyAPIView):
     def patch(self, request, *args, **kwargs):
         order = Order.objects.get(pk=self.kwargs['pk'])
         print(order.delivery_crew)
-        if order.delivery_crew != self.request.user:
-            return Response("Not Assigned to this order")
-        order.status = not order.status
-        order.save()
-        return Response("Status for order #: " + str(order.id) + " changed to: " + str(order.status), 201)
+        #if order.delivery_crew != self.request.user:
+            #return Response("Not Assigned to this order")
+        if self.request.user.groups.filter(name="Managers").exists():
+            crew = get_object_or_404(User, pk=self.request.data['delivery_crew'])
+            order.delivery_crew = crew
+            order.save()
+            return Response("Status for order #: " + str(order.id) + " updated delivery crew to : " + str(order.delivery_crew), 201)
+        else:
+            order.status = not order.status
+            order.save()
+            return Response("Status for order #: " + str(order.id) + " changed to: " + str(order.status), 201)
+        
+        
 
     def delete(self, request, *args, **kwargs):
         order = Order.objects.get(pk=self.kwargs['pk'])
